@@ -7,10 +7,17 @@
   $query = <<<SQL
 SELECT masterDevice.deviceId AS id,
        masterDevice.userName AS name,
-       masterDevice.interconnect,
+       masterDevice.interconnect AS interconnect,
        zigbeeDevice.deviceType AS deviceTypeId
 FROM masterDevice, zigbeeDevice
-WHERE zigbeeDevice.masterId = masterDevice.deviceId;
+WHERE zigbeeDevice.masterId = masterDevice.deviceId
+UNION
+SELECT masterDevice.deviceId AS id,
+       masterDevice.userName AS name,
+       masterDevice.interconnect AS interconnect,
+       lutronDevice.deviceClass AS deviceClassId
+FROM masterDevice, lutronDevice
+WHERE lutronDevice.masterId = masterDevice.deviceId;
 SQL;
 
   $result = $db->query($query);
@@ -23,10 +30,22 @@ SQL;
         while($row = $result->fetchArray(SQLITE3_ASSOC)){
                 $attr_query = <<<SQL
 SELECT zigbeeDeviceState.attributeId AS attributeTypeId,
-       zigbeeDeviceState.value_get AS value
-FROM zigbeeDevice, zigbeeDeviceState
+       zigbeeDeviceState.value_get AS value,
+	   zigbeeAttribute.description AS description,
+	   zigbeeAttribute.dataType AS dataType
+FROM zigbeeDevice, zigbeeDeviceState, zigbeeAttribute
 WHERE zigbeeDevice.globalId = zigbeeDeviceState.globalId
-      AND zigbeeDevice.masterId = '{$row['id']}';
+      AND zigbeeDevice.masterId = '{$row['id']}'
+	  AND zigbeeAttribute.attributeId = zigbeeDeviceState.attributeId
+UNION ALL
+SELECT lutronDeviceState.attributeId AS attributeTypeId,
+       lutronDeviceState.value_get AS value,
+	   lutronAttribute.description AS description,
+	   lutronAttribute.dataType AS dataType
+FROM lutronDevice, lutronDeviceState, lutronAttribute
+WHERE lutronDevice.lNodeId = lutronDeviceState.lNodeId
+      AND lutronDevice.masterId = '{$row['id']}'
+	  AND lutronAttribute.attributeId = lutronDeviceState.attributeId;
 SQL;
 
                 $attr_result = $db->query($attr_query);
